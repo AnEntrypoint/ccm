@@ -14,6 +14,7 @@ interface Message {
 const PORT = Number(process.env.CCM_PORT ?? 7777);
 const HOST = process.env.CCM_HOST ?? '127.0.0.1';
 const MAX_QUEUE = Number(process.env.CCM_MAX_QUEUE ?? 1000);
+const WEBHOOK_URL = process.env.CCM_WEBHOOK_URL;
 
 let nextId = 1;
 let queue: Message[] = [];
@@ -47,6 +48,33 @@ server.registerTool(
     return {
       content: [{ type: 'text', text: JSON.stringify(drained, null, 2) }],
     };
+  },
+);
+
+server.registerTool(
+  'send_message',
+  {
+    description: 'Send a text message by POSTing JSON {text, sentAt} to the configured webhook (CCM_WEBHOOK_URL).',
+    inputSchema: { text: z.string().min(1).max(64_000) },
+  },
+  async ({ text }) => {
+    if (!WEBHOOK_URL) {
+      return { isError: true, content: [{ type: 'text', text: 'CCM_WEBHOOK_URL is not set' }] };
+    }
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, sentAt: new Date().toISOString(), source: 'ccm-inbox' }),
+      });
+      const ok = res.ok;
+      return {
+        isError: !ok,
+        content: [{ type: 'text', text: `webhook responded ${res.status}` }],
+      };
+    } catch (err) {
+      return { isError: true, content: [{ type: 'text', text: `webhook failed: ${(err as Error).message}` }] };
+    }
   },
 );
 
