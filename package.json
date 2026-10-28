@@ -1,12 +1,13 @@
 {
   "name": "ccm",
   "version": "1.0.0",
-  "description": "",
+  "description": "MCP stdio server with an HTTP inbox and webhook sender",
   "main": "dist/index.js",
   "scripts": {
-    "test": "node test-e2e.mjs",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "prepare": "tsc",
+    "start": "node dist/index.js",
+    "test": "node test-e2e.mjs"
   },
   "keywords": [],
   "type": "module",
@@ -20,5 +21,12 @@
   },
   "bin": {
     "ccm-inbox": "dist/index.js"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnEntrypoint/ccm.git"
+  },
+  "files": [
+    "dist"
+  ]
 }
