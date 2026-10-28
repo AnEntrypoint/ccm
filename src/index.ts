@@ -21,15 +21,22 @@ let queue: Message[] = [];
 
 const server = new McpServer(
   { name: 'ccm-inbox', version: '0.1.0' },
-  { capabilities: { logging: {} } },
+  {
+    capabilities: { logging: {}, experimental: { 'claude/channel': {} } },
+    instructions:
+      'Inbox messages arrive as <channel source="ccm-inbox" from="..." message_id="...">. ' +
+      'They are inbound chat from the voice host or other senders. Reply with the send_message tool; it delivers to the configured webhook.',
+  },
 );
 
 async function notify(msg: Message): Promise<void> {
   try {
-    await server.sendLoggingMessage({
-      level: 'notice',
-      logger: 'ccm-inbox',
-      data: msg,
+    // Standard logging notification: any MCP client that renders logs gets it.
+    await server.sendLoggingMessage({ level: 'notice', logger: 'ccm-inbox', data: msg });
+    // Claude Code channel push: clients that do not declare claude/channel ignore it.
+    await server.server.notification({
+      method: 'notifications/claude/channel',
+      params: { content: msg.text, meta: { from: msg.from, message_id: String(msg.id) } },
     });
   } catch (err) {
     console.error('notify skipped (no connected client):', (err as Error).message);
