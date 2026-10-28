@@ -12,6 +12,10 @@ MCP server (TypeScript SDK, stdio transport) with a small HTTP inbox. Messages P
 
 Env: `CCM_PORT` (7777), `CCM_HOST` (127.0.0.1), `CCM_MAX_QUEUE` (1000), `CCM_WEBHOOK_URL` (outbound webhook, see below).
 
+## Event-driven clients (any MCP client)
+
+Resource `ccm://inbox` lists pending messages. Clients that subscribe (`resources/subscribe`) get `notifications/resources/updated` for each new message, then read the resource. `read_messages` still drains the queue. `npm test` covers this with a plain MCP client (`test-subscribe.mjs`).
+
 ## Outbound messages (webhook)
 
 The MCP tool `send_message` takes `{"text"}` and POSTs `{"text","sentAt","source":"ccm-inbox"}` as JSON to `CCM_WEBHOOK_URL`. The tool reports the webhook's HTTP status, and is an error if the URL is unset, unreachable, or returns a non-2xx status.

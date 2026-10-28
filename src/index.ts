@@ -2,7 +2,11 @@
 import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SubscribeRequestSchema, UnsubscribeRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+
+const INBOX_URI = 'ccm://inbox';
+const subscriptions = new Set<string>();
 
 interface Message {
   id: number;
@@ -22,15 +26,33 @@ let queue: Message[] = [];
 const server = new McpServer(
   { name: 'ccm-inbox', version: '0.1.0' },
   {
-    capabilities: { logging: {}, experimental: { 'claude/channel': {} } },
+    capabilities: { logging: {}, resources: { subscribe: true }, experimental: { 'claude/channel': {} } },
     instructions:
       'Inbox messages arrive as <channel source="ccm-inbox" from="..." message_id="...">. ' +
       'They are inbound chat from the voice host or other senders. Reply with the send_message tool; it delivers to the configured webhook.',
   },
 );
 
+server.registerResource(
+  'inbox',
+  INBOX_URI,
+  { description: 'Pending inbox messages. Subscribe for resources/updated on each new message; read to see the queue (read_messages drains it).', mimeType: 'application/json' },
+  async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(queue, null, 2) }] }),
+);
+
+server.server.setRequestHandler(SubscribeRequestSchema, async ({ params }) => {
+  subscriptions.add(params.uri);
+  return {};
+});
+
+server.server.setRequestHandler(UnsubscribeRequestSchema, async ({ params }) => {
+  subscriptions.delete(params.uri);
+  return {};
+});
+
 async function notify(msg: Message): Promise<void> {
   try {
+    if (subscriptions.has(INBOX_URI)) await server.server.sendResourceUpdated({ uri: INBOX_URI });
     // Standard logging notification: any MCP client that renders logs gets it.
     await server.sendLoggingMessage({ level: 'notice', logger: 'ccm-inbox', data: msg });
     // Claude Code channel push: clients that do not declare claude/channel ignore it.
